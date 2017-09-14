@@ -36,7 +36,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
 # Set the version information here
 set(VERSION_INFO_MAJOR_VERSION 3)
-set(VERSION_INFO_API_COMPAT    7)
+set(VERSION_INFO_API_COMPAT    8)
 set(VERSION_INFO_MINOR_VERSION 0)
 set(VERSION_INFO_MAINT_VERSION git)
 include(GrVersion) #setup version info
@@ -121,7 +121,7 @@ endif (QT_FOUND)
 # Find gnuradio build dependencies
 ########################################################################
 set(GR_REQUIRED_COMPONENTS RUNTIME FFT)
-find_package(Gnuradio 3.7.3 REQUIRED)
+find_package(Gnuradio 3.8.0 REQUIRED)
 
 find_package(CppUnit)
 if(NOT CPPUNIT_FOUND)
