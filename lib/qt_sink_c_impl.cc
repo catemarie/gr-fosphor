@@ -30,7 +30,9 @@
 
 #include <QApplication>
 #include <QWidget>
-#include <QGLWidget>
+#include <QOpenGLContext>
+#include <QOpenGLWidget>
+#include <QThread>
 
 #include "QGLSurface.h"
 
@@ -57,6 +59,7 @@ qt_sink_c_impl::qt_sink_c_impl(QWidget *parent)
 		d_qApplication = new QApplication(argc, argv);
 	}
 
+	this->d_render_lock = new QMutex(QMutex::Recursive);
 	this->d_gui = new QGLSurface(parent, this);
 }
 
@@ -64,14 +67,38 @@ qt_sink_c_impl::qt_sink_c_impl(QWidget *parent)
 void
 qt_sink_c_impl::glctx_init()
 {
-	this->d_gui->makeCurrent();
+	/* Grab lock and context */
+	this->lock_render();
+	this->d_gui->grabContext();
+
+	/* Make sure we have the focus */
 	this->d_gui->setFocus();
 }
 
 void
 qt_sink_c_impl::glctx_swap()
 {
-	this->d_gui->swapBuffers();
+	printf("swap ...\n");
+	/* Release lock and context */
+	this->d_gui->releaseContext();
+	this->unlock_render();
+
+	/* Request update */
+	QMetaObject::invokeMethod(
+		this->d_gui,
+		"update",
+		Qt::QueuedConnection
+	);
+	printf("swap mid\n");
+
+	/* Wait for update complete */
+	sleep(1);
+		/* FIXME */
+
+	/* Grab lock and context back */
+	this->lock_render();
+	this->d_gui->grabContext();
+	printf("swap done\n");
 }
 
 void
@@ -83,13 +110,28 @@ qt_sink_c_impl::glctx_poll()
 void
 qt_sink_c_impl::glctx_fini()
 {
-	this->d_gui->doneCurrent();
+	/* Release lock and context */
+	this->d_gui->releaseContext();
+	this->unlock_render();
 }
 
 void
 qt_sink_c_impl::glctx_update()
 {
 	this->d_gui->makeCurrent();
+}
+
+
+void
+qt_sink_c_impl::lock_render()
+{
+	this->d_render_lock->lock();
+}
+
+void
+qt_sink_c_impl::unlock_render()
+{
+	this->d_render_lock->unlock();
 }
 
 

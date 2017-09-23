@@ -19,6 +19,9 @@
  */
 
 #include <QtEvents>
+#include <QOpenGLContext>
+#include <QThread>
+
 #include "QGLSurface.h"
 #include "qt_sink_c_impl.h"
 
@@ -28,12 +31,43 @@ namespace gr {
   namespace fosphor {
 
 QGLSurface::QGLSurface(QWidget *parent, qt_sink_c_impl *block)
-  : QGLWidget(parent), d_block(block)
+  : QOpenGLWidget(parent), d_block(block)
 {
-	this->doneCurrent();
+	/* Connect signals */
+	connect(this, &QOpenGLWidget::aboutToCompose,	this, &QGLSurface::onAboutToCompose);
+	connect(this, &QOpenGLWidget::frameSwapped,	this, &QGLSurface::onFrameSwapped);
+	connect(this, &QOpenGLWidget::aboutToResize,	this, &QGLSurface::onAboutToResize);
+	connect(this, &QOpenGLWidget::resized,		this, &QGLSurface::onResized);
+
+	/* Allow invoke with QThread* */
+	qRegisterMetaType<QThread*>("QThread*");
+
+	/* Save the pointer to the main GUI thread */
+	this->d_gui_thread = this->thread();
+
+	/* Acquire the lock until we're ready to render */
+	this->d_block->lock_render();
+
+	/* QWidget policies */
 	this->setFocusPolicy(Qt::StrongFocus);
 	this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
+
+
+void
+QGLSurface::initializeGL()
+{
+	/* At this point the context should be ready, so we're notifying anyone waiting */
+	this->d_block->unlock_render();
+}
+
+void
+QGLSurface::resizeGL(int w, int h)
+{
+	/* Call back to main block */
+	this->d_block->cb_reshape(w, h);
+}
+
 
 void
 QGLSurface::paintEvent(QPaintEvent *pe)
@@ -45,18 +79,6 @@ QGLSurface::paintEvent(QPaintEvent *pe)
 	 * _other_ threads to be current, so we need a dummy empty impl
 	 * for the paintEvent
 	 */
-}
-
-void
-QGLSurface::resizeEvent(QResizeEvent *re)
-{
-	/*
-	 * The default implementation calls makeCurrent but here we want
-	 * _other_ threads to be current, so don't do that !
-	 */
-
-	/* Call back to main block */
-	this->d_block->cb_reshape(re->size().width(), re->size().height());
 }
 
 void
@@ -101,6 +123,64 @@ QGLSurface::keyPressEvent(QKeyEvent *ke)
 		break;
 	}
 }
+
+
+void
+QGLSurface::grabContext()
+{
+        QMetaObject::invokeMethod(
+                this,
+                "giveContext",
+                Qt::BlockingQueuedConnection,
+                Q_ARG(QThread*, QThread::currentThread())
+        );
+
+	this->makeCurrent();
+}
+
+void
+QGLSurface::releaseContext()
+{
+	this->doneCurrent();
+	this->context()->moveToThread(this->d_gui_thread);
+}
+
+
+void
+QGLSurface::giveContext(QThread *thread)
+{
+	this->context()->moveToThread(thread);
+}
+
+
+void
+QGLSurface::onAboutToCompose()
+{
+	printf("QGLSurface::onAboutToCompose\n");
+	this->d_block->lock_render();
+}
+
+void
+QGLSurface::onFrameSwapped()
+{
+	printf("QGLSurface::onFrameSwapped\n");
+	this->d_block->unlock_render();
+}
+
+void
+QGLSurface::onAboutToResize()
+{
+	printf("QGLSurface::onAboutToResize\n");
+	this->d_block->lock_render();
+}
+
+void
+QGLSurface::onResized()
+{
+	printf("QGLSurface::onResized\n");
+	this->d_block->unlock_render();
+}
+
 
   } /* namespace fosphor */
 } /* namespace gr */

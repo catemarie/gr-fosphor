@@ -21,26 +21,42 @@
 #ifndef INCLUDED_GR_FOSPHOR_QGLSURFACE_H
 #define INCLUDED_GR_FOSPHOR_QGLSURFACE_H
 
-#include <QGLWidget>
+#include <QOpenGLWidget>
+
+class QThread;
 
 namespace gr {
   namespace fosphor {
 
     class qt_sink_c_impl;
 
-    class QGLSurface : public ::QGLWidget
+    class QGLSurface : public ::QOpenGLWidget
     {
       Q_OBJECT
 
       qt_sink_c_impl *d_block;
+      QThread *d_gui_thread;
 
      protected:
+      void initializeGL();
+      void resizeGL(int w, int h);
+
       void paintEvent(QPaintEvent *pe);
-      void resizeEvent(QResizeEvent *re);
       void keyPressEvent(QKeyEvent *ke);
+
+     private slots:
+      void giveContext(QThread *thread);
+
+      void onAboutToCompose();
+      void onFrameSwapped();
+      void onAboutToResize();
+      void onResized();
 
      public:
       QGLSurface(QWidget *parent, qt_sink_c_impl *d_block);
+
+      void grabContext();
+      void releaseContext();
     };
 
   } // namespace fosphor

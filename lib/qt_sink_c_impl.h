@@ -22,14 +22,16 @@
 #ifndef INCLUDED_GR_FOSPHOR_QT_SINK_C_IMPL_H
 #define INCLUDED_GR_FOSPHOR_QT_SINK_C_IMPL_H
 
+#include <QMutex>
+
 #include <gnuradio/fosphor/qt_sink_c.h>
 
 #include "base_sink_c_impl.h"
 
-class QGLWidget;
-
 namespace gr {
   namespace fosphor {
+
+    class QGLSurface;
 
     /*!
      * \brief Qt version of fosphor sink (implementation)
@@ -40,7 +42,8 @@ namespace gr {
      friend class QGLSurface;
 
      private:
-      QGLWidget *d_gui;
+      QGLSurface *d_gui;
+      QMutex *d_render_lock;
 
      protected:
       /* Delegated implementation of GL context management */
@@ -49,6 +52,10 @@ namespace gr {
       void glctx_poll();
       void glctx_fini();
       void glctx_update();
+
+      /* Thread sync for Qt */
+      void lock_render();
+      void unlock_render();
 
      public:
       qt_sink_c_impl(QWidget *parent=NULL);
